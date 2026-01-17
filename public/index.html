@@ -52,145 +52,21 @@
     </style>
 </head>
 <body>
-    <h2>Nhập tên:</h2>
-    <input type="text" id="nameInput" placeholder="Nhập tên...">
-    <button onclick="register()">Kết nối</button>
 
-    <h3>Danh sách thiết bị khả dụng:</h3>
+    <h2>Enter your name:</h2>
+    <input type="text" id="nameInput" placeholder="Your name">
+    <button onclick="register()">Connect</button>
+
+    <h3>List of existing users:</h3>
     <ul id="clientList"></ul>
 
-    <button id="callButton" disabled>Bắt đầu gọi</button>
-    <button id="hangupButton" disabled>Dừng</button>
+    <button id="callButton" disabled>Call</button>
+    <button id="hangupButton" disabled>Stop</button>
 
     <h3>Video</h3>
     <video id="localVideo" autoplay playsinline></video>
     <video id="remoteVideo" autoplay playsinline></video>
 
-    <script>
-        const ws = new WebSocket('wss://192.168.1.81:3000');
-        let localStream;
-        let peerConnections = {};
-        let myName = '';
-        let selectedClient = '';
-
-        async function register() {
-            myName = document.getElementById('nameInput').value.trim();
-            if (!myName) return alert("Vui lòng nhập tên!");
-
-            ws.send(JSON.stringify({ type: 'register', name: myName }));
-            document.getElementById('callButton').disabled = false;
-
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById('localVideo').srcObject = localStream;
-        }
-
-        ws.onmessage = async (event) => {
-            const message = JSON.parse(event.data);
-
-            if (message.type === 'clientList') {
-                updateClientList(message.clients);
-            } else if (message.type === 'endCall') {
-                closeAllConnections();
-            } else {
-                await handleMessage(message);
-            }
-        };
-
-        function updateClientList(clients) {
-            const list = document.getElementById('clientList');
-            list.innerHTML = '';
-
-            clients.forEach(name => {
-                if (name !== myName) {
-                    const listItem = document.createElement('li');
-                    listItem.textContent = name;
-                    listItem.onclick = () => selectClient(name);
-                    list.appendChild(listItem);
-                }
-            });
-        }
-
-        function selectClient(name) {
-            selectedClient = name;
-            document.getElementById('callButton').disabled = false;
-        }
-
-        async function startCall() {
-            if (!selectedClient) return alert("Chọn một thiết bị để gọi!");
-
-            closeAllConnections();
-            const pc = setupPeerConnection(selectedClient);
-
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-
-            ws.send(JSON.stringify({ type: 'offer', offer, target: selectedClient, sender: myName }));
-            document.getElementById('hangupButton').disabled = false;
-        }
-
-        function setupPeerConnection(targetClient) {
-            let pc = new RTCPeerConnection();
-
-            pc.ontrack = event => {
-                document.getElementById('remoteVideo').srcObject = event.streams[0];
-            };
-
-            pc.onicecandidate = event => {
-                if (event.candidate) {
-                    ws.send(JSON.stringify({
-                        type: "candidate",
-                        candidate: event.candidate,
-                        target: targetClient,
-                        sender: myName
-                    }));
-                }
-            };
-
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-            peerConnections[targetClient] = pc;
-            return pc;
-        }
-
-        async function handleMessage(message) {
-            if (message.type === 'offer') {
-                closeAllConnections();
-
-                const acceptCall = confirm(`${message.sender} đang gọi. Bạn có muốn chấp nhận cuộc gọi không?`);
-                if (!acceptCall) {
-                    ws.send(JSON.stringify({ type: 'endCall', sender: myName, target: message.sender }));
-                    return;
-                }
-
-                let pc = setupPeerConnection(message.sender);
-                await pc.setRemoteDescription(new RTCSessionDescription(message.offer));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-
-                ws.send(JSON.stringify({ type: "answer", answer, target: message.sender, sender: myName }));
-                document.getElementById('hangupButton').disabled = false;
-            } else if (message.type === 'answer') {
-                let pc = peerConnections[message.sender];
-                if (pc) {
-                    await pc.setRemoteDescription(new RTCSessionDescription(message.answer));
-                }
-            } else if (message.type === 'candidate') {
-                let pc = peerConnections[message.sender];
-                if (pc) {
-                    pc.addIceCandidate(new RTCIceCandidate(message.candidate));
-                }
-            }
-        }
-
-        function closeAllConnections() {
-            for (let target in peerConnections) {
-                peerConnections[target].close();
-                delete peerConnections[target];
-            }
-            document.getElementById('hangupButton').disabled = true;
-        }
-
-        document.getElementById('callButton').addEventListener('click', startCall);
-        document.getElementById('hangupButton').addEventListener('click', closeAllConnections);
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>

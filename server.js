@@ -13,7 +13,7 @@ try {
         cert: fs.readFileSync('./certs/cert.pem')
     };
 } catch (error) {
-    console.error('Lỗi tải chứng chỉ SSL:', error);
+    console.error('Error load SSL certfiticate:', error);
     process.exit(1);
 }
 
@@ -55,9 +55,9 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'endCall') {
                 endCall(data.sender);
-            }
+            }   
         } catch (error) {
-            console.error('Lỗi xử lý tin nhắn:', error);
+            console.error('Error handle message:', error);
         }
     });
 
@@ -95,6 +95,8 @@ function endCall(client) {
     }
 }
 
+
+
 server.listen(3000, '0.0.0.0', () => {
-    console.log('Server chạy trên https://192.168.1.81:3000');
+    console.log('Server is running on https://192.168.1.81:3000');
 });
