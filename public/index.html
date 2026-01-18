@@ -4,68 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebRTC Call</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-        }
-        h2, h3 {
-            color: #333;
-        }
-        input, button {
-            padding: 10px;
-            margin: 10px;
-            font-size: 16px;
-        }
-        button {
-            background-color: #28a745;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #clientList {
-            list-style: none;
-            padding: 0;
-        }
-        #clientList li {
-            background: white;
-            padding: 10px;
-            margin: 5px;
-            cursor: pointer;
-            border-radius: 5px;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-        }
-        video {
-            width: 45%;
-            max-height: 300px;
-            margin: 10px;
-            border: 2px solid #333;
-            border-radius: 5px;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="container">
+        <h2>Enter your name</h2>
+        <input type="text" id="nameInput" placeholder="Your name">
+        <button onclick="register()">Connect</button>
 
-    <h2>Enter your name:</h2>
-    <input type="text" id="nameInput" placeholder="Your name">
-    <button onclick="register()">Connect</button>
+        <h3>Online users</h3>
+        <ul id="clientList"></ul>
 
-    <h3>List of existing users:</h3>
-    <ul id="clientList"></ul>
+        <div class="controls">
+            <button id="callButton" disabled>Call</button>
+            <button id="hangupButton" disabled>Stop</button>
+        </div>
 
-    <button id="callButton" disabled>Call</button>
-    <button id="hangupButton" disabled>Stop</button>
-
-    <h3>Video</h3>
-    <video id="localVideo" autoplay playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
+        <h3>Video</h3>
+        <div class="videos">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>
