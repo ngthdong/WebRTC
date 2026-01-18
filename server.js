@@ -1,24 +1,27 @@
 const fs = require('fs');
-const https = require('https');
+const http = require('http');
 const express = require('express');
 const WebSocket = require('ws');
 const path = require('path');
 
 const app = express();
-let options;
 
-try {
-    options = {
-        key: fs.readFileSync('./certs/key.pem'),
-        cert: fs.readFileSync('./certs/cert.pem')
+function getIceConfig() {
+    return {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            {
+                urls: `turn:${process.env.TURN_SERVER}`,
+                username: process.env.TURN_USER,
+                credential: process.env.TURN_PASSWORD
+            }
+        ]
     };
-} catch (error) {
-    console.error('Error load SSL certfiticate:', error);
-    process.exit(1);
 }
 
-const server = https.createServer(options, app);
+const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const clients = new Map();
@@ -26,6 +29,11 @@ const activeCalls = new Map();
 
 wss.on('connection', (ws) => {
     let clientName = null;
+
+    ws.send(JSON.stringify({
+        type: 'ice',
+        data: getIceConfig()
+    }));
 
     ws.on('message', (message) => {
         try {
@@ -95,8 +103,6 @@ function endCall(client) {
     }
 }
 
-
-
 server.listen(3000, '0.0.0.0', () => {
-    console.log('Server is running on https://192.168.1.81:3000');
+    console.log(`Server is running on https://supertragic-steadyingly-vernie.ngrok-free.dev`);
 });

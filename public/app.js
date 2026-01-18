@@ -1,4 +1,6 @@
-const ws = new WebSocket('wss://192.168.1.81:3000');
+const ws = new WebSocket(`wss://supertragic-steadyingly-vernie.ngrok-free.dev`);
+
+const rtcConfig = null
 
 let localStream;
 let peerConnections = {};
@@ -24,6 +26,10 @@ async function register() {
 
 ws.onmessage = async (event) => {
     const message = JSON.parse(event.data);
+
+    if (message.type === 'ice') {
+        rtcConfig = message.data;
+    }
 
     if (message.type === 'clientList') {
         updateClientList(message.clients);
@@ -76,7 +82,7 @@ async function startCall() {
 }
 
 function setupPeerConnection(targetClient) {
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection(rtcConfig);
 
     pc.ontrack = (event) => {
         document.getElementById('remoteVideo').srcObject = event.streams[0];
@@ -164,3 +170,4 @@ document.getElementById('callButton')
 
 document.getElementById('hangupButton')
     .addEventListener('click', closeAllConnections);
+    
