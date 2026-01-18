@@ -1,6 +1,7 @@
-const ws = new WebSocket(`wss://supertragic-steadyingly-vernie.ngrok-free.dev`);
+const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${wsProtocol}://${location.host}`);
 
-const rtcConfig = null
+let rtcConfig = null
 
 let localStream;
 let peerConnections = {};
@@ -10,7 +11,7 @@ let selectedClient = '';
 async function register() {
     myName = document.getElementById('nameInput').value.trim();
     if (!myName) {
-        alert("Vui lòng nhập tên!");
+        alert("Name cannot be empty!");
         return;
     }
 
