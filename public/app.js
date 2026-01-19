@@ -1,174 +1,238 @@
 const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${wsProtocol}://${location.host}`);
 
-let rtcConfig = null
-
+let rtcConfig;
 let localStream;
 let peerConnections = {};
+
 let myName = '';
-let selectedClient = '';
+let selectedRoom = '';
+let currentRoom = '';
+let lastRoomList = [];
+
+async function ensureLocalStream() {
+    if (localStream) return;
+
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+    const video = document.getElementById('localVideo');
+    video.srcObject = localStream;
+    video.muted = true;
+    video.style.transform = 'scaleX(-1)';
+    await video.play();
+}
+
+function stopLocalMedia() {
+    if (!localStream) return;
+
+    localStream.getTracks().forEach(track => {
+        track.stop(); 
+    });
+
+    localStream = null;
+
+    const localVideo = document.getElementById('localVideo');
+    localVideo.srcObject = null;
+}
 
 async function register() {
     myName = document.getElementById('nameInput').value.trim();
-    if (!myName) {
-        alert("Name cannot be empty!");
-        return;
-    }
+    if (!myName) return alert('Name required');
 
     ws.send(JSON.stringify({ type: 'register', name: myName }));
-    document.getElementById('callButton').disabled = false;
+    ws.send(JSON.stringify({ type: 'listRooms' }));
 
-    localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-    });
-    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('connectButton').disabled = true;
+    document.getElementById('createRoom').disabled = false;
 }
 
-ws.onmessage = async (event) => {
-    const message = JSON.parse(event.data);
+ws.onmessage = async (e) => {
+    const msg = JSON.parse(e.data);
 
-    if (message.type === 'ice') {
-        rtcConfig = message.data;
-    }
+    switch (msg.type) {
+        case 'ice':
+            rtcConfig = msg.data;
+            break;
 
-    if (message.type === 'clientList') {
-        updateClientList(message.clients);
-    } else if (message.type === 'endCall') {
-        closeAllConnections();
-    } else {
-        await handleMessage(message);
+        case 'roomList':
+            updateRoomList(msg.rooms);
+            break;
+
+        case 'roomMembers':
+            await callRoomMembers(msg.members);
+            break;
+
+        case 'offer':
+            await handleOffer(msg);
+            break;
+
+        case 'answer':
+            await handleAnswer(msg);
+            break;
+
+        case 'candidate':
+            await handleCandidate(msg);
+            break;
+
+        case 'endCall':
+            closePeer(msg.sender);
+            break;
     }
 };
 
-function updateClientList(clients) {
-    const list = document.getElementById('clientList');
-    list.innerHTML = '';
+function updateRoomList(rooms) {
+    lastRoomList = rooms;
+    const ul = document.getElementById('roomList');
+    ul.innerHTML = '';
 
-    clients.forEach(name => {
-        if (name !== myName) {
-            const li = document.createElement('li');
-            li.textContent = name;
-            li.onclick = () => selectClient(name);
-            list.appendChild(li);
-        }
+    rooms.forEach(r => {
+        const li = document.createElement('li');
+        li.textContent = `${r.room} (${r.members})`;
+
+        li.onclick = () => {
+            selectedRoom = r.room;
+            document.getElementById('callButton').disabled = false;
+            updateRoomList(lastRoomList);
+        };
+
+        if (r.room === selectedRoom) li.classList.add('active-room');
+        ul.appendChild(li);
     });
 }
 
-function selectClient(name) {
-    selectedClient = name;
-    document.getElementById('callButton').disabled = false;
-}
+async function createRoom() {
+    await ensureLocalStream();
 
-async function startCall() {
-    if (!selectedClient) {
-        alert("Select a device to make a call!");
-        return;
-    }
+    const room = `room-${myName}`;
+    ws.send(JSON.stringify({ type: 'createRoom', room }));
 
-    closeAllConnections();
-    const pc = setupPeerConnection(selectedClient);
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    ws.send(JSON.stringify({
-        type: 'offer',
-        offer,
-        target: selectedClient,
-        sender: myName
-    }));
-
+    currentRoom = room;
+    document.getElementById('createRoom').disabled = true;
     document.getElementById('hangupButton').disabled = false;
 }
 
-function setupPeerConnection(targetClient) {
+async function startCall() {
+    if (!selectedRoom) return alert('Select room');
+
+    if (currentRoom !== selectedRoom) {
+        stopCall();
+    }
+
+    await ensureLocalStream();
+
+    ws.send(JSON.stringify({
+        type: 'joinRoom',
+        room: selectedRoom
+    }));
+
+    currentRoom = selectedRoom;
+}
+
+async function callRoomMembers(members) {
+    for (const peer of members) {
+        const pc = setupPeerConnection(peer);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        ws.send(JSON.stringify({
+            type: 'offer',
+            offer,
+            target: peer,
+            sender: myName
+        }));
+    }
+
+    document.getElementById('callButton').disabled = true;
+    document.getElementById('hangupButton').disabled = false;
+}
+
+function setupPeerConnection(target) {
     const pc = new RTCPeerConnection(rtcConfig);
 
-    pc.ontrack = (event) => {
-        document.getElementById('remoteVideo').srcObject = event.streams[0];
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    pc.ontrack = e => {
+        document.getElementById('remoteVideo').srcObject = e.streams[0];
     };
 
-    pc.onicecandidate = (event) => {
-        if (event.candidate) {
+    pc.onicecandidate = e => {
+        if (e.candidate) {
             ws.send(JSON.stringify({
                 type: 'candidate',
-                candidate: event.candidate,
-                target: targetClient,
+                candidate: e.candidate,
+                target,
                 sender: myName
             }));
         }
     };
 
-    localStream.getTracks().forEach(track =>
-        pc.addTrack(track, localStream)
-    );
-
-    peerConnections[targetClient] = pc;
+    peerConnections[target] = pc;
     return pc;
 }
 
-async function handleMessage(message) {
-    if (message.type === 'offer') {
-        closeAllConnections();
+async function handleOffer(msg) {
+    await ensureLocalStream();
 
-        const accept = confirm(
-            `${message.sender} Incoming call. Do you want to accept the call?`
-        );
+    const pc = setupPeerConnection(msg.sender);
+    await pc.setRemoteDescription(msg.offer);
 
-        if (!accept) {
-            ws.send(JSON.stringify({
-                type: 'endCall',
-                sender: myName,
-                target: message.sender
-            }));
-            return;
-        }
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
 
-        const pc = setupPeerConnection(message.sender);
-        await pc.setRemoteDescription(new RTCSessionDescription(message.offer));
+    ws.send(JSON.stringify({
+        type: 'answer',
+        answer,
+        target: msg.sender,
+        sender: myName
+    }));
+}
 
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+async function handleAnswer(msg) {
+    const pc = peerConnections[msg.sender];
+    if (pc) await pc.setRemoteDescription(msg.answer);
+}
 
-        ws.send(JSON.stringify({
-            type: 'answer',
-            answer,
-            target: message.sender,
-            sender: myName
-        }));
+async function handleCandidate(msg) {
+    const pc = peerConnections[msg.sender];
+    if (pc) await pc.addIceCandidate(msg.candidate);
+}
 
-        document.getElementById('hangupButton').disabled = false;
-
-    } else if (message.type === 'answer') {
-        const pc = peerConnections[message.sender];
-        if (pc) {
-            await pc.setRemoteDescription(
-                new RTCSessionDescription(message.answer)
-            );
-        }
-
-    } else if (message.type === 'candidate') {
-        const pc = peerConnections[message.sender];
-        if (pc) {
-            await pc.addIceCandidate(
-                new RTCIceCandidate(message.candidate)
-            );
-        }
+function closePeer(peer) {
+    if (peerConnections[peer]) {
+        peerConnections[peer].close();
+        delete peerConnections[peer];
     }
 }
 
 function closeAllConnections() {
-    for (const target in peerConnections) {
-        peerConnections[target].close();
-        delete peerConnections[target];
-    }
+    Object.values(peerConnections).forEach(pc => pc.close());
+    peerConnections = {};
+    document.getElementById('remoteVideo').srcObject = null;
+}
+
+function stopCall() {
+    Object.keys(peerConnections).forEach(peer => {
+        ws.send(JSON.stringify({
+            type: 'endCall',
+            sender: myName,
+            target: peer
+        }));
+    });
+
+    ws.send(JSON.stringify({
+        type: 'leaveRoom',
+        room: currentRoom
+    }));
+
+    closeAllConnections();
+    stopLocalMedia();
+    currentRoom = '';
+
+    document.getElementById('createRoom').disabled = false;
+    document.getElementById('callButton').disabled = true;
     document.getElementById('hangupButton').disabled = true;
 }
 
-document.getElementById('callButton')
-    .addEventListener('click', startCall);
-
-document.getElementById('hangupButton')
-    .addEventListener('click', closeAllConnections);
-    
+document.getElementById('createRoom').onclick = createRoom;
+document.getElementById('callButton').onclick = startCall;
+document.getElementById('hangupButton').onclick = stopCall;

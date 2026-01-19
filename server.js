@@ -1,9 +1,7 @@
-const fs = require('fs');
 const http = require('http');
 const express = require('express');
 const WebSocket = require('ws');
 const path = require('path');
-
 require('dotenv').config();
 
 const app = express();
@@ -12,8 +10,8 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const clients = new Map();
-const activeCalls = new Map();
+const clients = new Map(); 
+const rooms = new Map();   
 
 wss.on('connection', (ws) => {
     let clientName = null;
@@ -23,46 +21,73 @@ wss.on('connection', (ws) => {
         data: getIceConfig()
     }));
 
-    ws.on('message', (message) => {
-        try {
-            const data = JSON.parse(message);
+    ws.on('message', (msg) => {
+        const data = JSON.parse(msg);
 
-            if (data.type === 'register') {
+        switch (data.type) {
+            case 'register':
                 clientName = data.name;
                 clients.set(clientName, ws);
-                broadcastClients();
+                broadcastRooms();
+                break;
+
+            case 'createRoom':
+                rooms.set(data.room, {
+                    owner: clientName,
+                    members: new Set([clientName])
+                });
+                broadcastRooms();
+                break;
+
+            case 'joinRoom': {
+                const room = rooms.get(data.room);
+                if (!room) return;
+
+                room.members.add(clientName);
+
+                ws.send(JSON.stringify({
+                    type: 'roomMembers',
+                    members: [...room.members].filter(u => u !== clientName)
+                }));
+
+                broadcastRooms();
+                break;
             }
 
-            if (data.type === 'offer') {
-                if (activeCalls.has(data.target)) {
-                    let oldCaller = activeCalls.get(data.target);
-                    if (clients.has(oldCaller)) {
-                        clients.get(oldCaller).send(JSON.stringify({ type: 'endCall' }));
-                    }
-                }
-                activeCalls.set(data.target, data.sender);
-                activeCalls.set(data.sender, data.target);
+            case 'leaveRoom': {
+                const room = rooms.get(data.room);
+                if (!room) return;
+
+                room.members.delete(clientName);
+                if (room.members.size === 0) rooms.delete(data.room);
+
+                broadcastRooms();
+                break;
+            }
+
+            case 'offer':
+            case 'answer':
+            case 'candidate':
+            case 'endCall':
                 forwardMessage(data);
-            }
+                break;
 
-            if (data.type === 'answer' || data.type === 'candidate') {
-                forwardMessage(data);
-            }
-
-            if (data.type === 'endCall') {
-                endCall(data.sender);
-            }   
-        } catch (error) {
-            console.error('Error handle message:', error);
+            case 'listRooms':
+                sendRooms(ws);
+                break;
         }
     });
 
     ws.on('close', () => {
-        if (clientName) {
-            endCall(clientName);
-            clients.delete(clientName);
-            broadcastClients();
+        if (!clientName) return;
+
+        for (const [id, room] of rooms.entries()) {
+            room.members.delete(clientName);
+            if (room.members.size === 0) rooms.delete(id);
         }
+
+        clients.delete(clientName);
+        broadcastRooms();
     });
 });
 
@@ -79,31 +104,43 @@ function getIceConfig() {
     };
 }
 
-function broadcastClients() {
-    const clientList = Array.from(clients.keys());
-    for (const [name, client] of clients.entries()) {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'clientList', clients: clientList }));
-        }
-    }
-}
-
 function forwardMessage(data) {
-    const targetClient = clients.get(data.target);
-    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-        targetClient.send(JSON.stringify(data));
+    const ws = clients.get(data.target);
+    if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
     }
 }
 
-function endCall(client) {
-    if (activeCalls.has(client)) {
-        let partner = activeCalls.get(client);
-        activeCalls.delete(client);
-        activeCalls.delete(partner);
-        forwardMessage({ type: 'endCall', target: partner });
+function broadcastRooms() {
+    const list = [];
+
+    for (const [roomId, room] of rooms.entries()) {
+        list.push({
+            room: roomId,
+            owner: room.owner,
+            members: room.members.size
+        });
     }
+
+    clients.forEach(ws => {
+        ws.send(JSON.stringify({ type: 'roomList', rooms: list }));
+    });
+}
+
+function sendRooms(ws) {
+    const list = [];
+
+    for (const [roomId, room] of rooms.entries()) {
+        list.push({
+            room: roomId,
+            owner: room.owner,
+            members: room.members.size
+        });
+    }
+
+    ws.send(JSON.stringify({ type: 'roomList', rooms: list }));
 }
 
 server.listen(3000, '0.0.0.0', () => {
-    console.log(`Server is running on https://supertragic-steadyingly-vernie.ngrok-free.dev`);
+    console.log('Server running');
 });

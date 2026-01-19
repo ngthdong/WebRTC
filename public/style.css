@@ -60,7 +60,7 @@ button:not(:disabled) {
     color: #000;
 }
 
-#clientList {
+#roomList {
     list-style: none;
     padding: 0;
     margin: 16px 0;
@@ -69,7 +69,7 @@ button:not(:disabled) {
     gap: 10px;
 }
 
-#clientList li {
+#roomList li {
     background: rgba(255, 255, 255, 0.15);
     padding: 10px;
     border-radius: 10px;
@@ -78,8 +78,19 @@ button:not(:disabled) {
     transition: background 0.2s;
 }
 
-#clientList li:hover {
+#roomList li:hover {
     background: rgba(255, 255, 255, 0.25);
+}
+
+#roomList li {
+    cursor: pointer;
+    padding: 6px 10px;
+}
+
+#roomList li.active-room {
+    background-color: #4caf50;
+    color: white;
+    font-weight: bold;
 }
 
 .controls {
@@ -104,4 +115,10 @@ video {
     background: black;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+#localVideo {
+    transform: scaleX(-1);
+    border-radius: 8px;
+    background: #000;
 }

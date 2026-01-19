@@ -10,10 +10,14 @@
     <div class="container">
         <h2>Enter your name</h2>
         <input type="text" id="nameInput" placeholder="Your name">
-        <button onclick="register()">Connect</button>
+        <button id='connectButton' onclick="register()">Connect</button>
+        
+        <div class="controls">
+            <button id="createRoom" disabled onclick="createRoom()">Create Room</button>
+        </div>
 
-        <h3>Online users</h3>
-        <ul id="clientList"></ul>
+        <h3>Available rooms</h3>
+        <ul id="roomList"></ul>
 
         <div class="controls">
             <button id="callButton" disabled>Call</button>
