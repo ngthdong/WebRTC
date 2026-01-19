@@ -4,21 +4,9 @@ const express = require('express');
 const WebSocket = require('ws');
 const path = require('path');
 
+require('dotenv').config();
+
 const app = express();
-
-function getIceConfig() {
-    return {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            {
-                urls: `turn:${process.env.TURN_SERVER}`,
-                username: process.env.TURN_USER,
-                credential: process.env.TURN_PASSWORD
-            }
-        ]
-    };
-}
-
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -77,6 +65,19 @@ wss.on('connection', (ws) => {
         }
     });
 });
+
+function getIceConfig() {
+    return {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            {
+                urls: `turn:${process.env.TURN_SERVER}`,
+                username: process.env.TURN_USER,
+                credential: process.env.TURN_PASSWORD
+            }
+        ]
+    };
+}
 
 function broadcastClients() {
     const clientList = Array.from(clients.keys());
