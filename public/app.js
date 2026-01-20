@@ -33,6 +33,9 @@ function stopLocalMedia() {
 
     const localVideo = document.getElementById('localVideo');
     localVideo.srcObject = null;
+
+    document.getElementById('toggleMic').disabled = true;
+    document.getElementById('toggleCamera').disabled = true;
 }
 
 async function register() {
@@ -89,6 +92,14 @@ function updateRoomList(rooms) {
         const li = document.createElement('li');
         li.textContent = `${r.room} (${r.members})`;
 
+        if (r.room === currentRoom) {
+            li.classList.add('current-room');
+        }
+
+        else if (r.room === selectedRoom) {
+            li.classList.add('active-room');
+        }
+        
         li.onclick = () => {
             selectedRoom = r.room;
             document.getElementById('callButton').disabled = false;
@@ -109,6 +120,9 @@ async function createRoom() {
     currentRoom = room;
     document.getElementById('createRoom').disabled = true;
     document.getElementById('hangupButton').disabled = false;
+
+    document.getElementById('toggleMic').disabled = false;
+    document.getElementById('toggleCamera').disabled = false;
 }
 
 async function startCall() {
@@ -144,6 +158,9 @@ async function callRoomMembers(members) {
 
     document.getElementById('callButton').disabled = true;
     document.getElementById('hangupButton').disabled = false;
+
+    document.getElementById('toggleMic').disabled = false;
+    document.getElementById('toggleCamera').disabled = false;
 }
 
 function setupPeerConnection(target) {
@@ -154,15 +171,12 @@ function setupPeerConnection(target) {
     pc.ontrack = e => {
         const remoteVideo = document.getElementById('remoteVideo');
 
-        if (remoteVideo.srcObject) return;
-
-        remoteVideo.srcObject = e.streams[0];
-        remoteVideo.muted = true;          
-        remoteVideo.playsInline = true;    
-
-        remoteVideo.play().catch(err => {
-            console.warn('Remote video play blocked:', err);
-        });
+        if (!remoteVideo.srcObject) {
+            remoteVideo.srcObject = e.streams[0];
+            remoteVideo.playsInline = true;
+            remoteVideo.muted = false; 
+            remoteVideo.play().catch(console.warn);
+        }
     };
 
     pc.onicecandidate = e => {
@@ -242,6 +256,20 @@ function stopCall() {
     document.getElementById('callButton').disabled = true;
     document.getElementById('hangupButton').disabled = true;
 }
+
+toggleMic.onclick = () => {
+    const track = localStream.getAudioTracks()[0];
+    track.enabled = !track.enabled;
+    toggleMic.classList.toggle('on', track.enabled);
+    toggleMic.classList.toggle('off', !track.enabled);
+};
+
+toggleCamera.onclick = () => {
+    const track = localStream.getVideoTracks()[0];
+    track.enabled = !track.enabled;
+    toggleCamera.classList.toggle('on', track.enabled);
+    toggleCamera.classList.toggle('off', !track.enabled);
+};
 
 document.getElementById('createRoom').onclick = createRoom;
 document.getElementById('callButton').onclick = startCall;

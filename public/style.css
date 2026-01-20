@@ -16,7 +16,7 @@ h2, h3 {
 }
 
 .container {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 0 auto;
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
@@ -56,8 +56,13 @@ button:disabled {
 }
 
 button:not(:disabled) {
-    background: #00c853;
+    background: #00c853; 
     color: #000;
+}
+
+#hangupButton:not(:disabled) {
+    background: #e53935; 
+    color: #fff;
 }
 
 #roomList {
@@ -88,7 +93,13 @@ button:not(:disabled) {
 }
 
 #roomList li.active-room {
-    background-color: #4caf50;
+    background-color: #81ff85;
+    color: white;
+    font-weight: bold;
+}
+
+#roomList li.current-room {
+    background-color: #ec7070;
     color: white;
     font-weight: bold;
 }
@@ -111,10 +122,12 @@ button:not(:disabled) {
 
 video {
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     background: black;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    object-fit: contain;
+    aspect-ratio: 16 / 9;
 }
 
 #localVideo {
@@ -147,4 +160,50 @@ video {
     .copyright {
         display: none;
     }
+}
+
+.call-controls {
+    margin-top: 15px; 
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+.control-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: none;
+
+    background: #1f2937; 
+    color: #fff;
+    font-size: 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.control-btn:hover {
+    background: #374151;
+}
+
+.control-btn:active {
+    transform: scale(0.92);
+}
+
+.control-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.control-btn.on {
+    background: #00c853;
+}
+
+.control-btn.off {
+    background: #dc2626;
 }
