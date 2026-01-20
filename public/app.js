@@ -152,7 +152,17 @@ function setupPeerConnection(target) {
     localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
     pc.ontrack = e => {
-        document.getElementById('remoteVideo').srcObject = e.streams[0];
+        const remoteVideo = document.getElementById('remoteVideo');
+
+        if (remoteVideo.srcObject) return;
+
+        remoteVideo.srcObject = e.streams[0];
+        remoteVideo.muted = true;          
+        remoteVideo.playsInline = true;    
+
+        remoteVideo.play().catch(err => {
+            console.warn('Remote video play blocked:', err);
+        });
     };
 
     pc.onicecandidate = e => {
