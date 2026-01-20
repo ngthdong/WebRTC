@@ -125,13 +125,26 @@ video {
 
 .copyright {
     position: fixed;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    padding: 8px 0;
     font-size: 13px;
-    opacity: 0.6;
-    color: #fff;
     text-align: center;
+
+    color: #fff;
+    opacity: 0.6;
+    background: transparent;
+
     pointer-events: none;
     user-select: none;
+
+    z-index: 10;
+}
+
+@media (max-height: 600px) {
+    .copyright {
+        display: none;
+    }
 }
