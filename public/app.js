@@ -76,6 +76,13 @@ ws.onmessage = async (e) => {
         case 'candidate':
             await handleCandidate(msg);
             break;
+        
+        case 'roomRenamed':
+            if (currentRoom === msg.oldRoom) {
+                currentRoom = msg.newRoom;
+            }
+            updateRoomListAfterRename(msg);
+            break;
 
         case 'endCall':
             closePeer(msg.sender);

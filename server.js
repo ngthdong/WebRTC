@@ -59,7 +59,22 @@ wss.on('connection', (ws) => {
                 if (!room) return;
 
                 room.members.delete(clientName);
-                if (room.members.size === 0) rooms.delete(data.room);
+
+                if (room.owner === clientName) {
+                    const newOwner = room.members.values().next().value;
+
+                    if (!newOwner) {
+                        rooms.delete(data.room);
+                        broadcastRooms();
+                        break;
+                    }
+
+                    const newRoomId = renameRoom(data.room, newOwner);
+
+                    broadcastRoomRenamed(data.room, newRoomId, newOwner);
+                    broadcastRooms();
+                    break;
+                }
 
                 broadcastRooms();
                 break;
@@ -81,9 +96,26 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         if (!clientName) return;
 
-        for (const [id, room] of rooms.entries()) {
+        for (const [roomId, room] of rooms.entries()) {
+            if (!room.members.has(clientName)) continue;
+
             room.members.delete(clientName);
-            if (room.members.size === 0) rooms.delete(id);
+
+            if (room.owner === clientName) {
+                const newOwner = room.members.values().next().value;
+
+                if (!newOwner) {
+                    rooms.delete(roomId);
+                    continue;
+                }
+
+                const newRoomId = renameRoom(roomId, newOwner);
+                broadcastRoomRenamed(roomId, newRoomId, newOwner);
+            }
+
+            if (room.members.size === 0) {
+                rooms.delete(roomId);
+            }
         }
 
         clients.delete(clientName);
@@ -139,6 +171,33 @@ function sendRooms(ws) {
     }
 
     ws.send(JSON.stringify({ type: 'roomList', rooms: list }));
+}
+
+function renameRoom(oldRoomId, newOwner) {
+    const room = rooms.get(oldRoomId);
+    if (!room) return null;
+
+    const newRoomId = `room-${newOwner}`;
+
+    rooms.set(newRoomId, {
+        owner: newOwner,
+        members: room.members
+    });
+
+    rooms.delete(oldRoomId);
+
+    return newRoomId;
+}
+
+function broadcastRoomRenamed(oldId, newId, owner) {
+    clients.forEach(ws => {
+        ws.send(JSON.stringify({
+            type: 'roomRenamed',
+            oldRoom: oldId,
+            newRoom: newId,
+            owner
+        }));
+    });
 }
 
 server.listen(3000, '0.0.0.0', () => {
