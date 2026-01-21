@@ -147,6 +147,8 @@ async function startCall() {
     }));
 
     currentRoom = selectedRoom;
+
+    document.getElementById('createRoom').disabled = true;
 }
 
 async function callRoomMembers(members) {
@@ -176,14 +178,25 @@ function setupPeerConnection(target) {
     localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
     pc.ontrack = e => {
-        const remoteVideo = document.getElementById('remoteVideo');
+        let video = document.getElementById(`remote-${target}`);
 
-        if (!remoteVideo.srcObject) {
-            remoteVideo.srcObject = e.streams[0];
-            remoteVideo.playsInline = true;
-            remoteVideo.muted = false; 
-            remoteVideo.play().catch(console.warn);
+        if (!video) {
+            video = document.createElement('video');
+            video.id = `remote-${target}`;
+            video.autoplay = true;
+            video.playsInline = true;
+
+            video.muted = true;
+
+            video.className = 'video remote';
+            document.getElementById('videos').appendChild(video);
         }
+
+        video.srcObject = e.streams[0];
+
+        video.play().catch(err => {
+            console.warn('Autoplay blocked:', err);
+        });
     };
 
     pc.onicecandidate = e => {
@@ -233,12 +246,17 @@ function closePeer(peer) {
         peerConnections[peer].close();
         delete peerConnections[peer];
     }
+
+    const video = document.getElementById(`remote-${peer}`);
+    if (video) video.remove();
 }
 
 function closeAllConnections() {
-    Object.values(peerConnections).forEach(pc => pc.close());
+    Object.keys(peerConnections).forEach(peer => {
+        closePeer(peer); 
+    });
+
     peerConnections = {};
-    document.getElementById('remoteVideo').srcObject = null;
 }
 
 function stopCall() {
@@ -248,6 +266,8 @@ function stopCall() {
             sender: myName,
             target: peer
         }));
+
+        closePeer(peer);
     });
 
     ws.send(JSON.stringify({

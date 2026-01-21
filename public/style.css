@@ -113,21 +113,34 @@ button:not(:disabled) {
 }
 
 .videos {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
-    justify-content: center;
+
     margin-top: 16px;
-    flex-wrap: wrap;
+    padding: 12px;
+
+    max-height: 480px;        
+    overflow-y: auto;        
+    overflow-x: hidden;
+
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
 }
 
-video {
+.video {
     width: 100%;
-    max-width: 420px;
+    aspect-ratio: 16 / 9;
+    object-fit: contrain;
+
     background: black;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    object-fit: contain;
-    aspect-ratio: 16 / 9;
+}
+
+.video.local {
+    transform: scaleX(-1);
+    outline: 2px solid #22c55e; 
 }
 
 #localVideo {
@@ -206,4 +219,11 @@ video {
 
 .control-btn.off {
     background: #dc2626;
+}
+
+@media (max-width: 640px) {
+    .videos {
+        grid-template-columns: 1fr; 
+        max-height: 60vh;
+    }
 }
