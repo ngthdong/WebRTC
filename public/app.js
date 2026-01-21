@@ -13,11 +13,15 @@ let lastRoomList = [];
 async function ensureLocalStream() {
     if (localStream) return;
 
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+    });
 
     const video = document.getElementById('localVideo');
     video.srcObject = localStream;
-    video.muted = true;
+    video.muted = true;             
+    video.playsInline = true;
     video.style.transform = 'scaleX(-1)';
     await video.play();
 }
@@ -25,10 +29,7 @@ async function ensureLocalStream() {
 function stopLocalMedia() {
     if (!localStream) return;
 
-    localStream.getTracks().forEach(track => {
-        track.stop(); 
-    });
-
+    localStream.getTracks().forEach(track => track.stop());
     localStream = null;
 
     const localVideo = document.getElementById('localVideo');
@@ -76,7 +77,7 @@ ws.onmessage = async (e) => {
         case 'candidate':
             await handleCandidate(msg);
             break;
-        
+
         case 'roomRenamed':
             if (currentRoom === msg.oldRoom) {
                 currentRoom = msg.newRoom;
@@ -99,24 +100,20 @@ function updateRoomList(rooms) {
         const li = document.createElement('li');
         li.textContent = `${r.room} (${r.members})`;
 
-        if (r.room === currentRoom) {
-            li.classList.add('current-room');
-        }
+        if (r.room === currentRoom) li.classList.add('current-room');
+        if (r.room === selectedRoom) li.classList.add('active-room');
 
-        else if (r.room === selectedRoom) {
-            li.classList.add('active-room');
-        }
-        
         li.onclick = () => {
             selectedRoom = r.room;
             document.getElementById('callButton').disabled = false;
             updateRoomList(lastRoomList);
         };
 
-        if (r.room === selectedRoom) li.classList.add('active-room');
         ul.appendChild(li);
     });
 }
+
+/* ===================== ROOM ACTION ===================== */
 
 async function createRoom() {
     await ensureLocalStream();
@@ -125,9 +122,9 @@ async function createRoom() {
     ws.send(JSON.stringify({ type: 'createRoom', room }));
 
     currentRoom = room;
+
     document.getElementById('createRoom').disabled = true;
     document.getElementById('hangupButton').disabled = false;
-
     document.getElementById('toggleMic').disabled = false;
     document.getElementById('toggleCamera').disabled = false;
 }
@@ -135,7 +132,7 @@ async function createRoom() {
 async function startCall() {
     if (!selectedRoom) return alert('Select room');
 
-    if (currentRoom !== selectedRoom) {
+    if (currentRoom && currentRoom !== selectedRoom) {
         stopCall();
     }
 
@@ -147,8 +144,9 @@ async function startCall() {
     }));
 
     currentRoom = selectedRoom;
-
     document.getElementById('createRoom').disabled = true;
+
+    resumeRemoteAudio(); 
 }
 
 async function callRoomMembers(members) {
@@ -167,17 +165,20 @@ async function callRoomMembers(members) {
 
     document.getElementById('callButton').disabled = true;
     document.getElementById('hangupButton').disabled = false;
-
     document.getElementById('toggleMic').disabled = false;
     document.getElementById('toggleCamera').disabled = false;
+
+    resumeRemoteAudio();
 }
 
 function setupPeerConnection(target) {
     const pc = new RTCPeerConnection(rtcConfig);
 
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+    });
 
-    pc.ontrack = e => {
+    pc.ontrack = (e) => {
         let video = document.getElementById(`remote-${target}`);
 
         if (!video) {
@@ -185,21 +186,16 @@ function setupPeerConnection(target) {
             video.id = `remote-${target}`;
             video.autoplay = true;
             video.playsInline = true;
-
-            video.muted = true;
-
+            video.muted = false;             
             video.className = 'video remote';
             document.getElementById('videos').appendChild(video);
         }
 
         video.srcObject = e.streams[0];
-
-        video.play().catch(err => {
-            console.warn('Autoplay blocked:', err);
-        });
+        video.play().catch(() => {});
     };
 
-    pc.onicecandidate = e => {
+    pc.onicecandidate = (e) => {
         if (e.candidate) {
             ws.send(JSON.stringify({
                 type: 'candidate',
@@ -229,6 +225,8 @@ async function handleOffer(msg) {
         target: msg.sender,
         sender: myName
     }));
+
+    resumeRemoteAudio();
 }
 
 async function handleAnswer(msg) {
@@ -252,10 +250,7 @@ function closePeer(peer) {
 }
 
 function closeAllConnections() {
-    Object.keys(peerConnections).forEach(peer => {
-        closePeer(peer); 
-    });
-
+    Object.keys(peerConnections).forEach(closePeer);
     peerConnections = {};
 }
 
@@ -266,7 +261,6 @@ function stopCall() {
             sender: myName,
             target: peer
         }));
-
         closePeer(peer);
     });
 
@@ -284,15 +278,28 @@ function stopCall() {
     document.getElementById('hangupButton').disabled = true;
 }
 
+function resumeRemoteAudio() {
+    document.querySelectorAll('video.remote').forEach(v => {
+        v.muted = false;
+        v.play().catch(() => {});
+    });
+}
+
 toggleMic.onclick = () => {
+    if (!localStream) return;
     const track = localStream.getAudioTracks()[0];
+    if (!track) return;
+
     track.enabled = !track.enabled;
     toggleMic.classList.toggle('on', track.enabled);
     toggleMic.classList.toggle('off', !track.enabled);
 };
 
 toggleCamera.onclick = () => {
+    if (!localStream) return;
     const track = localStream.getVideoTracks()[0];
+    if (!track) return;
+
     track.enabled = !track.enabled;
     toggleCamera.classList.toggle('on', track.enabled);
     toggleCamera.classList.toggle('off', !track.enabled);
