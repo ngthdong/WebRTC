@@ -200,6 +200,8 @@ function broadcastRoomRenamed(oldId, newId, owner) {
     });
 }
 
-server.listen(3000, '0.0.0.0', () => {
-    console.log('Server running');
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+    console.log(`Signaling server running on port ${PORT}`);
 });
